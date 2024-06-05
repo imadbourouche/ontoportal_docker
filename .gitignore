@@ -1,5 +1,9 @@
 .env
 dip.override.yml
-
-
 .kamal/hooks/
+
+/ontologies_linked_data/
+/.idea/
+
+ontologies_linked_data
+
