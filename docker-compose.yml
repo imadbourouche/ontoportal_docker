@@ -1,0 +1,230 @@
+x-app: &app
+  environment: &env
+    API_URL: http://api-prod:9393
+    BUNDLE_PATH: /srv/ontoportal/bundle
+    COVERAGE: 'true'
+    REDIS_HOST: redis-ut
+    REDIS_GOO_CACHE_HOST: redis-ut
+    REDIS_HTTP_CACHE_HOST: redis-ut
+    REDIS_PERSISTENT_HOST: redis-ut
+    REDIS_PORT: 6379
+    SOLR_TERM_SEARCH_URL: http://solr-ut:8983/solr
+    SOLR_PROP_SEARCH_URL: http://solr-ut:8983/solr
+    GOO_BACKEND_NAME: 4store
+    GOO_PORT: 9000
+    GOO_HOST: 4store-ut
+    MGREP_HOST: mgrep-ut
+    MGREP_PORT: 55555
+    REPOSITORY_FOLDER: /srv/ontoportal/data/repository
+    REPORT_PATH: /srv/ontoportal/data/reports/ontologies_report.json
+    MGREP_DICTIONARY_FILE: /srv/ontoportal/data/mgrep
+    BUNDLE_APP_CONFIG: /srv/ontoportal/ontologies_api/.bundle
+  stdin_open: true
+  tty: true
+  command: /bin/bash
+
+
+x-ui_app: &ui_app
+  image: agroportal/ontoportal_web_ui:master
+  environment: &ui_env
+    SITE: AstroPortal
+    ORG: LIRMM
+    ORG_URL: http://www.lirmm.fr
+    UI_URL: http://localhost:3000
+    API_URL: http://api-prod:9393
+    #API_URL: https://data.stageportal.lirmm.fr/
+    API_KEY: 1de0a270-29c5-4dda-b043-7c3580628cd5
+    UI_THEME: agroportal
+    TWITTER_NEWS: ""
+    BIOMIXER_URL: ""
+    BIOMIXER_APIKEY: ""
+    ANNOTATOR_URL: ""
+    FAIRNESS_DISABLED: false
+    FAIRNESS_URL: "https://services.stageportal.lirmm.fr/ofaire/"
+    NCBO_ANNOTATORPLUS_ENABLED: false
+    NCBO_ANNOTATOR_URL: ""
+    NCBO_API_KEY: ""
+    SUPPORT_EMAIL: sifrportal-support@lirmm.fr
+    RELEASE_VERSION: "OntoPortal Appliance 3.0.1"
+    ANALYTICS_ID: ""
+    USE_RECAPTCHA: false
+    DB_HOST: db
+    CACHE_HOST: cache
+    RAILS_ENV: "production"
+    BUNDLE_WITHOUT: "development test"
+    BUNDLE_PATH: "/usr/local/bundle"
+    BIOPORTAL_WEB_UI_DATABASE_PASSWORD: root
+    MEMCACHE_SERVERS: "cache:11211"
+    # SECRET_KEY_BASE: "my-secret-base-132146574684"
+    #RAILS_MASTER_KEY: TODO
+  volumes:
+    - node:/node_modules
+    - app_ui:/app
+    - bundle:/srv/ontoportal/bundle
+    - rails_cache:/app/tmp/cache
+    - assets:/app/public/assets
+  tmpfs:
+    - /tmp
+    - /app/tmp/pids
+  tty: true
+
+
+services:
+  api-prod:
+    image: agroportal/ontologies_api:master
+    environment:
+      <<: *env
+    depends_on:
+      solr-ut:
+        condition: service_healthy
+      redis-ut:
+        condition: service_healthy
+      mgrep-ut:
+        condition: service_started
+      4store-ut:
+        condition: service_started
+      ncbo_cron:
+        condition: service_started
+    ports:
+      - "9393:9393"
+    volumes:
+      - app_api:/srv/ontoportal/ontologies_api
+      - repository:/srv/ontoportal/data/repository
+    command: >
+      sh -c "rm -fr tmp/pids/unicorn.pid && (bundle check || bundle install) && bundle exec unicorn -c config/unicorn.rb -E production -l 9393"
+    stdin_open: true
+    tty: true
+    
+  ncbo_cron:
+    <<: *app
+    image: agroportal/ncbo_cron:master
+    environment:
+      <<: *env
+    command: "bundle exec bin/ncbo_cron"
+    volumes:
+      - app_cron:/srv/ontoportal/ncbo_cron
+      - repository:/srv/ontoportal/data/repository
+      - history:/usr/local/hist
+      - reports:/srv/ontoportal/data/reports
+      - mgrep:/srv/ontoportal/data/mgrep
+      - logs:/srv/ontoportal/ncbo_cron/logs
+    depends_on:
+      solr-ut:
+        condition: service_healthy
+      redis-ut:
+        condition: service_healthy
+      mgrep-ut:
+        condition: service_started
+      4store-ut:
+        condition: service_started
+
+
+  mgrep-ut:
+    image: ontoportal/mgrep-ncbo:0.1
+    ports:
+      - "55556:55555"
+
+  redis-ut:
+    image: redis
+    ports:
+      - "6379:6379"
+    command: [ "redis-server", "--save", "", "--appendonly", "no" ]
+    healthcheck:
+      test: redis-cli ping
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  4store-ut:
+    image: bde2020/4store
+    volumes:
+      - ./4store_repository:/var/lib/4store
+    command: >
+      bash -c "if [ ! -d '/var/lib/4store/ontoportal_kb' ]; then 4s-backend-setup --segments 4 ontoportal_kb; fi ; 4s-backend ontoportal_kb ; 4s-httpd -D -s-1 -p 9000 ontoportal_kb"
+    ports:
+      - "9000:9000"
+
+  solr-ut:
+    image: solr:8
+    ports:
+      - 8983:8983
+    command: bin/solr start -cloud -f
+    volumes:
+      - solr_data:/var/solr/data
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8983/solr/admin/info/system?wt=json" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+
+  # For the UI
+  ui-prod:
+    <<: *ui_app
+    environment:
+      <<: *ui_env
+    command: >
+      sh -c "(bundle check || bundle install) && bin/rails secret && EDITOR='nano' bin/rails credentials:edit && bin/rails db:prepare && bundle exec puma -C config/puma.rb"
+    # sh -c "/bin/bash"
+    ports:
+      - "3000:3000"
+    links:
+      - db
+      - cache
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_started
+      node:
+        condition: service_started
+
+  node:
+    <<: *ui_app
+    environment:
+      <<: *ui_env
+    command: "yarn build --watch"
+    depends_on:
+      - db
+      - cache
+
+  db:
+    image: "mysql:8.0"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      timeout: 5s
+      retries: 3
+
+  cache:
+    image: memcached:latest
+    restart: unless-stopped
+    command: [ "-m", "1024" ]
+    ports:
+      - "11211:11211"
+
+
+volumes:
+  app_api:
+  app_cron:
+  agdata:
+  4store:
+  repository:
+  solr_data:
+  reports:
+  mgrep:
+  logs:
+  history:
+
+  # Ui volumes
+  mysql-data:
+  bundle:
+  rails_cache:
+  assets:
+  node:
+  app_ui:
