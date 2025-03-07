@@ -22,7 +22,7 @@ docker compose up
 docker compose up api-prod
 ```
 
-- Run Ontoportal Appliance (api + ui)
+- Run Ontoportal Appliance ui
 ```
 docker compose up ui-prod
 ```
