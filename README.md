@@ -26,3 +26,10 @@ docker compose up api-prod
 ```
 docker compose up ui-prod
 ```
+
+### Result
+- UI
+![Screenshot from 2025-03-07 11-24-46](https://github.com/user-attachments/assets/0e244fb3-4493-4b3f-98f9-e51b9c2c74e4)
+
+- API
+![image](https://github.com/user-attachments/assets/6c496561-3f54-46d8-ba48-4116b004c39a)
