@@ -2,7 +2,7 @@ x-app: &app
   environment: &env
     API_URL: http://api-prod:9393
     BUNDLE_PATH: /srv/ontoportal/bundle
-    COVERAGE: 'true'
+    COVERAGE: "true"
     REDIS_HOST: redis-ut
     REDIS_GOO_CACHE_HOST: redis-ut
     REDIS_HTTP_CACHE_HOST: redis-ut
@@ -39,15 +39,15 @@ x-ui_app: &ui_app
     BIOMIXER_URL: ""
     BIOMIXER_APIKEY: ""
     ANNOTATOR_URL: ""
-    FAIRNESS_DISABLED: false
+    FAIRNESS_DISABLED: "false"
     FAIRNESS_URL: "https://services.stageportal.lirmm.fr/ofaire/"
-    NCBO_ANNOTATORPLUS_ENABLED: false
+    NCBO_ANNOTATORPLUS_ENABLED: "false"
     NCBO_ANNOTATOR_URL: ""
     NCBO_API_KEY: ""
     SUPPORT_EMAIL: sifrportal-support@lirmm.fr
     RELEASE_VERSION: "OntoPortal Appliance 3.0.1"
     ANALYTICS_ID: ""
-    USE_RECAPTCHA: false
+    USE_RECAPTCHA: "false"
     DB_HOST: db
     CACHE_HOST: cache
     RAILS_ENV: "production"
