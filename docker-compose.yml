@@ -97,14 +97,14 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-    
+
   ncbo_cron:
     <<: *app
     image: agroportal/ncbo_cron:master
     environment:
       <<: *env
     command: >
-      sh -c 'bundle exec bin/ncbo_cron'
+      sh -c "bundle exec bin/ncbo_cron"
     volumes:
       - app_cron:/srv/ontoportal/ncbo_cron
       - repository:/srv/ontoportal/data/repository
@@ -145,6 +145,7 @@ services:
       - ./4store_repository:/var/lib/4store
     command: >
       bash -c "if [ ! -d '/var/lib/4store/ontoportal_kb' ]; then 4s-backend-setup --segments 4 ontoportal_kb; fi ; 4s-backend ontoportal_kb ; 4s-httpd -D -s-1 -p 9000 ontoportal_kb"
+    restart: unless-stopped
 
   solr-ut:
     image: solr:8
@@ -205,6 +206,28 @@ services:
     network_mode: "host"
 
 
+  ofaire:
+      image: imadpyth/ofaire-service:latest
+      environment:
+        name: AstroPortal
+        url: http://localhost:9393
+        apikey: 1de0a270-29c5-4dda-b043-7c3580628cd5
+        cacheFilePath: /app/fairness-assessment
+        cacheEnabled: true
+        CRON_INTERVAL: "0 * * * *" #every minute
+      volumes:
+        - ofaire_data:/app/data
+      command: /app/run_fair_service.sh
+      depends_on:
+        api-prod:
+          condition: service_healthy
+      network_mode: "host"
+      healthcheck:
+        test: [ "CMD", "curl", "-f", "http://localhost:5000/status" ]
+        interval: 30s
+        timeout: 10s
+        retries: 3
+
 volumes:
   app_api:
   app_cron:
@@ -224,3 +247,6 @@ volumes:
   assets:
   node:
   app_ui:
+
+  # service ofaire
+  ofaire_data:
